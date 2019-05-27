@@ -64,4 +64,8 @@ public class AnswerDao {
 
         return jdbcTemplate.query(sql, rm, questionId);
     }
+
+    public void delete(Long answerId) {
+
+    }
 }
