@@ -1,23 +1,23 @@
 package next.controller.user;
 
-import core.mvc.Controller;
-import core.mvc.JspView;
-import core.mvc.View;
+import core.mvc.*;
 import next.controller.UserSessionUtils;
 import next.dao.UserDao;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class ListUserController implements Controller {
-	@Override
-	public View execute(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-		if (!UserSessionUtils.isLogined(req.getSession())) {
-			return new JspView("redirect:/users/loginForm");
-		}
+public class ListUserController extends AbstractController {
+    private UserDao userDao = new UserDao();
 
-		UserDao userDao = new UserDao();
-		req.setAttribute("users", userDao.findAll());
-		return new JspView("/user/list.jsp");
-	}
+    @Override
+    public ModelAndView execute(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        if (!UserSessionUtils.isLogined(request.getSession())) {
+            return jspView("redirect:/users/loginForm.next");
+        }
+
+        ModelAndView mav = jspView("/user/list.jsp");
+        mav.addObject("users", userDao.findAll());
+        return mav;
+    }
 }
