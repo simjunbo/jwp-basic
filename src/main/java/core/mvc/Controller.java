@@ -1,8 +1,10 @@
 package core.mvc;
 
+import next.controller.qna.CannotDeleteException;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 public interface Controller {
-    ModelAndView execute(HttpServletRequest request, HttpServletResponse response) throws Exception;
+    ModelAndView execute(HttpServletRequest request, HttpServletResponse response) throws Exception, CannotDeleteException;
 }
