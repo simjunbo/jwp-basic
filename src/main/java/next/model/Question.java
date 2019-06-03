@@ -84,4 +84,12 @@ public class Question {
             return false;
         return true;
     }
+
+    public boolean isSameUser(User userFromSession) {
+        return false;
+    }
+
+    public void update(Question newQuestion) {
+
+    }
 }
