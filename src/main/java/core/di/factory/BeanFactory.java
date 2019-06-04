@@ -1,74 +1,116 @@
 package core.di.factory;
 
-import java.lang.annotation.Annotation;
-import java.util.Arrays;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+public class BeanFactory implements BeanDefinitionRegistry {
+	private static final Logger log = LoggerFactory.getLogger(BeanFactory.class);
 
-import com.google.common.collect.Maps;
+	private Map<Class<?>, Object> beans = Maps.newHashMap();
 
-import core.annotation.Controller;
+	private Map<Class<?>, BeanDefinition> beanDefinitions = Maps.newHashMap();
+	private Set<Class<?>> preInstanticateBeans;
 
-public class BeanFactory {
-    private static final Logger logger = LoggerFactory.getLogger(BeanFactory.class);
+	public void initialize() {
+		for (Class<?> clazz : getBeanClasses()) {
+			getBean(clazz);
+		}
+	}
 
-    private Set<Class<?>> preInstanticateBeans;
+	public Set<Class<?>> getBeanClasses() {
+		return beanDefinitions.keySet();
+	}
 
-    private Map<Class<?>, Object> beans = Maps.newHashMap();
+	@SuppressWarnings("unchecked")
+	public <T> T getBean(Class<T> clazz) {
+		Object bean = beans.get(clazz);
+		if (bean != null) {
+			return (T) bean;
+		}
 
-    private List<Injector> injectors;
+		Class<?> concreteClass = findConcreteClass(clazz);
+		BeanDefinition beanDefinition = beanDefinitions.get(concreteClass);
+		bean = inject(beanDefinition);
+		beans.put(concreteClass, bean);
+		return (T) bean;
+	}
 
-    public BeanFactory(Set<Class<?>> preInstanticateBeans) {
-        this.preInstanticateBeans = preInstanticateBeans;
+	private Class<?> findConcreteClass(Class<?> clazz) {
+		Set<Class<?>> beanClasses = getBeanClasses();
+		Class<?> concreteClazz = BeanFactoryUtils.findConcreteClass(clazz, beanClasses);
+		if (!beanClasses.contains(concreteClazz)) {
+			throw new IllegalStateException(clazz + "는 Bean이 아니다.");
+		}
+		return concreteClazz;
+	}
 
-        injectors = Arrays.asList(new FieldInjector(this), new SetterInjector(this), new ConstructorInjector(this));
-    }
+	private Object inject(BeanDefinition beanDefinition) {
+		if (beanDefinition.getResolvedInjectMode() == InjectType.INJECT_NO) {
+			return BeanUtils.instantiate(beanDefinition.getBeanClass());
+		} else if (beanDefinition.getResolvedInjectMode() == InjectType.INJECT_FIELD) {
+			return injectFields(beanDefinition);
+		} else {
+			return injectConstructor(beanDefinition);
+		}
+	}
 
-    public Set<Class<?>> getPreInstanticateBeans() {
-        return preInstanticateBeans;
-    }
+	private Object injectConstructor(BeanDefinition beanDefinition) {
+		Constructor<?> constructor = beanDefinition.getInjectConstructor();
+		List<Object> args = Lists.newArrayList();
+		for (Class<?> clazz : constructor.getParameterTypes()) {
+			args.add(getBean(clazz));
+		}
+		return BeanUtils.instantiateClass(constructor, args.toArray());
+	}
 
-    @SuppressWarnings("unchecked")
-    public <T> T getBean(Class<T> requiredType) {
-        return (T) beans.get(requiredType);
-    }
+	private Object injectFields(BeanDefinition beanDefinition) {
+		Object bean = BeanUtils.instantiate(beanDefinition.getBeanClass());
+		Set<Field> injectFields = beanDefinition.getInjectFields();
+		for (Field field : injectFields) {
+			injectField(bean, field);
+		}
+		return bean;
+	}
 
-    public void initialize() {
-        for (Class<?> clazz : preInstanticateBeans) {
-            if (beans.get(clazz) == null) {
-                logger.debug("instantiated Class : {}", clazz);
-                inject(clazz);
-            }
-        }
-    }
+	private void injectField(Object bean, Field field) {
+		log.debug("Inject Bean : {}, Field : {}", bean, field);
+		try {
+			field.setAccessible(true);
+			field.set(bean, getBean(field.getType()));
+		} catch (IllegalAccessException | IllegalArgumentException e) {
+			log.error(e.getMessage());
+		}
+	}
 
-    private void inject(Class<?> clazz) {
-        for (Injector injector : injectors) {
-            injector.inject(clazz);
-        }
-    }
+	public void clear() {
+		beanDefinitions.clear();
+		beans.clear();
+	}
 
-    void registerBean(Class<?> clazz, Object bean) {
-        beans.put(clazz, bean);
-    }
+	@Override
+	public void registerBeanDefinition(Class<?> clazz, BeanDefinition beanDefinition) {
+		log.debug("register bean : {}", clazz);
+		beanDefinitions.put(clazz, beanDefinition);
+	}
 
-    public Map<Class<?>, Object> getControllers() {
-        Map<Class<?>, Object> controllers = Maps.newHashMap();
-        for (Class<?> clazz : preInstanticateBeans) {
-            Annotation annotation = clazz.getAnnotation(Controller.class);
-            if (annotation != null) {
-                controllers.put(clazz, beans.get(clazz));
-            }
-        }
-        return controllers;
-    }
+	public Set<Class<?>> getPreInstanticateBeans() {
+		return preInstanticateBeans;
+	}
 
-    void clear() {
-        preInstanticateBeans.clear();
-        beans.clear();
-    }
+	public void setPreInstanticateBeans(Set<Class<?>> preInstanticateBeans) {
+		this.preInstanticateBeans = preInstanticateBeans;
+	}
+
+	public void registerBean(Class<?> concreteClass, Object bean) {
+
+	}
 }
