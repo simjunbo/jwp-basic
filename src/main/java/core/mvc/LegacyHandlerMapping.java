@@ -4,6 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import core.nmvc.HandlerMapping;
+import next.dao.AnswerDao;
+import next.dao.JdbcAnswerDao;
+import next.dao.JdbcQuestionDao;
+import next.dao.QuestionDao;
+import next.service.QnaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +38,11 @@ public class LegacyHandlerMapping implements HandlerMapping {
 	private Map<String, Controller> mappings = new HashMap<>();
 
 	void initMapping() {
+		QuestionDao questionDao = new JdbcQuestionDao();
+		AnswerDao answerDao = new JdbcAnswerDao();
+
+		QnaService qnaService = new QnaService(questionDao, answerDao);
+
 		mappings.put("/", new HomeController());
 		mappings.put("/users/form", new ForwardController("/user/form.jsp"));
 		mappings.put("/users/loginForm", new ForwardController("/user/login.jsp"));
@@ -48,8 +58,8 @@ public class LegacyHandlerMapping implements HandlerMapping {
 		mappings.put("/qna/create", new CreateQuestionController());
 		mappings.put("/qna/updateForm", new UpdateFormQuestionController());
 		mappings.put("/qna/update", new UpdateQuestionController());
-		mappings.put("/qna/delete", new DeleteQuestionController());
-		mappings.put("/api/qna/deleteQuestion", new ApiDeleteQuestionController());
+		mappings.put("/qna/delete", new DeleteQuestionController(qnaService));
+		mappings.put("/api/qna/deleteQuestion", new ApiDeleteQuestionController(qnaService));
 		mappings.put("/api/qna/list", new ApiListQuestionController());
 		mappings.put("/api/qna/addAnswer", new AddAnswerController());
 		mappings.put("/api/qna/deleteAnswer", new DeleteAnswerController());
